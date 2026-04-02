@@ -12,7 +12,12 @@ from app.models.cart_item import CartItem
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.user import User
-from app.schemas.order import OrderResponse, OrderItemResponse
+from app.schemas.order import (
+    OrderResponse,
+    OrderItemResponse,
+    OrderStatusUpdate,
+    ALLOWED_ORDER_STATUSES,
+)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -191,3 +196,56 @@ async def get_all_orders(
         )
         for order in orders
     ]
+
+
+@router.patch("/{order_id}/status", response_model=OrderResponse)
+async def update_order_status(
+    order_id: int,
+    status_data: OrderStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    if status_data.status not in ALLOWED_ORDER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Недопустимый статус. Разрешены: {', '.join(ALLOWED_ORDER_STATUSES)}"
+        )
+
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    order.status = status_data.status
+    await db.commit()
+    await db.refresh(order)
+
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order.id)
+        .options(selectinload(Order.items))
+    )
+    updated_order = result.scalar_one()
+
+    return OrderResponse(
+        id=updated_order.id,
+        user_id=updated_order.user_id,
+        total_amount=float(updated_order.total_amount),
+        status=updated_order.status,
+        items=[
+            OrderItemResponse(
+                id=item.id,
+                product_id=item.product_id,
+                product_name=item.product_name,
+                price=float(item.price),
+                quantity=item.quantity,
+                total_price=float(item.total_price)
+            )
+            for item in updated_order.items
+        ]
+    )

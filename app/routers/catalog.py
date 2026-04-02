@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -73,8 +73,32 @@ async def create_product(
 
 
 @router.get("/products", response_model=list[ProductResponse])
-async def get_products(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Product))
+async def get_products(
+    db: AsyncSession = Depends(get_db),
+    search: str | None = Query(default=None, description="Поиск по названию товара"),
+    category_id: int | None = Query(default=None, description="Фильтр по категории"),
+    min_price: float | None = Query(default=None, ge=0, description="Минимальная цена"),
+    max_price: float | None = Query(default=None, ge=0, description="Максимальная цена"),
+    is_active: bool | None = Query(default=None, description="Фильтр по активности товара"),
+):
+    query = select(Product)
+
+    if search:
+        query = query.where(Product.name.ilike(f"%{search}%"))
+
+    if category_id is not None:
+        query = query.where(Product.category_id == category_id)
+
+    if min_price is not None:
+        query = query.where(Product.price >= min_price)
+
+    if max_price is not None:
+        query = query.where(Product.price <= max_price)
+
+    if is_active is not None:
+        query = query.where(Product.is_active == is_active)
+
+    result = await db.execute(query)
     products = result.scalars().all()
     return products
 

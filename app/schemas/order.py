@@ -1,6 +1,16 @@
 from pydantic import BaseModel
 
 
+ALLOWED_ORDER_STATUSES = {
+    "created",
+    "confirmed",
+    "processing",
+    "shipped",
+    "completed",
+    "cancelled",
+}
+
+
 class OrderItemResponse(BaseModel):
     id: int
     product_id: int
@@ -22,3 +32,7 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
