@@ -80,7 +80,7 @@ uvicorn app.main:app --reload
 
 http://localhost:8000/docs
 
-2. Запуск через Docker (рекомендуется)
+### 🔹2. Запуск через Docker (рекомендуется)
 docker compose up --build
 
 Открыть:
